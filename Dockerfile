@@ -9,7 +9,7 @@ RUN pip install flask
 RUN pip install pillow
 
 COPY ./src src
-COPY ./secrets.json secrets.json
+COPY ./settings.json settings.json
 COPY ./public public
 
 EXPOSE 8000
