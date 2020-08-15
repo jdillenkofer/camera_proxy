@@ -4,86 +4,60 @@ import time
 import logging
 import argparse
 import threading
-from queue import Queue
 from datetime import datetime
-from camera import Camera
-from flask import Flask, send_file, request, Response
+from queue import Queue
+from flask import Flask, send_file, request, Response, abort
 from PIL import Image
-from decoder import Decoder
+from camera_stream_manager import CameraStreamManager
 
 app = Flask(__name__)
 
 logger = logging.getLogger(__name__)
 
-def load_secrets_from_file(filename):
-    secrets = {}
-    with open(filename) as secret_file:
-        secrets = json.load(secret_file)
-    return secrets
+def load_settings_from_file(filename):
+    settings = {}
+    with open(filename) as settings_file:
+        settings = json.load(settings_file)
+    return settings
 
-secrets = load_secrets_from_file("secrets.json")
-device_sid = secrets["deviceSid"]
-username = secrets["username"]
-password = secrets["password"]
+settings = load_settings_from_file("settings.json")
+camera_settings = settings["cameras"]
 
-decoder = Decoder()
-camera = None
-camera_thread = None
-last_accessed = datetime.now()
-
-def start_decoding_camera_stream():
-    global decoder
-    global camera
-    global camera_thread
-    decoder = Decoder()
-    camera = Camera(device_sid, username, password)
-    def start_camera():
-        camera.start(lambda data: decoder.handle_packet(data))
-        
-    camera_thread = threading.Thread(target=start_camera, name="CameraThread", daemon=True)
-    camera_thread.start()
-
-def is_decoding_camera_stream():
-    global camera_thread
-    return camera_thread != None
-
-def stop_decoding_camera_stream():
-    global decoder
-    global camera
-    global camera_thread
-    decoder = Decoder()
-    camera.stop()
-    camera_thread.join()
-    camera = None
-    camera_thread = None
-
-def update_last_accessed_timestamp():
-    global last_accessed
-    last_accessed = datetime.now()
+camera_stream_manager = CameraStreamManager(camera_settings)
 
 def stop_camera_daemon():
-    global last_accessed
+    global camera_stream_manager
     while True:
-        if is_decoding_camera_stream() and last_accessed != None and (datetime.now() - last_accessed).total_seconds() > 45:
-            logger.info("Stopping camera stream")
-            stop_decoding_camera_stream()
+        with camera_stream_manager.stream_lock:
+            for stream in camera_stream_manager.streams:
+                name = stream["name"]
+                last_accessed = stream["last_accessed"]
+                if (datetime.now() - last_accessed).total_seconds() > 30:
+                    logger.info("Stopping camera stream %s", name)
+                    camera_stream_manager.stop_decoding_camera_stream(name)
         time.sleep(5)
 
 stop_camera_daemon_thread = threading.Thread(target=stop_camera_daemon, name="StopCameraDaemon", daemon=True)
 stop_camera_daemon_thread.start()
 
-@app.route('/api/v1/cameras/door/stream', methods=["GET"])
-def get_image_stream_from_camera():
-    update_last_accessed_timestamp()
-    if not is_decoding_camera_stream():
-        start_decoding_camera_stream()
+@app.route('/api/v1/cameras/<name>/stream', methods=["GET"])
+def get_image_stream_from_camera(name):
+    camera_stream_manager.update_last_accessed_timestamp(name)
+    stream = None
+    if not camera_stream_manager.is_stream_running(name):
+        stream = camera_stream_manager.start_decoding_camera_stream(name)
     
+    if stream is None:
+        stream = camera_stream_manager.get_stream_by_name(name)
+    if stream is None:
+        abort(404)
+    decoder = stream["decoder"]
     queue = Queue()
     decoder.add_frame_callback(lambda x: queue.put(x))
 
     def frame_generator():
         while True:
-            update_last_accessed_timestamp()
+            camera_stream_manager.update_last_accessed_timestamp(name)
             frame = queue.get()
             output = io.BytesIO()
             frame.save(output, 'JPEG')
@@ -92,14 +66,21 @@ def get_image_stream_from_camera():
                 b'Content-Type: image/jpeg\r\n\r\n' + output.read() + b'\r\n')
     return Response(frame_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/api/v1/cameras/door', methods=["GET"])
-def get_image_from_camera():
+@app.route('/api/v1/cameras/<name>', methods=["GET"])
+def get_image_from_camera(name):
     thumbnail_requested = request.args.get('thumbnail') != None
 
-    update_last_accessed_timestamp()
-    if not is_decoding_camera_stream():
-        start_decoding_camera_stream()
-    
+    camera_stream_manager.update_last_accessed_timestamp(name)
+    stream = None
+    if not camera_stream_manager.is_stream_running(name):
+        stream = camera_stream_manager.start_decoding_camera_stream(name)
+
+    if stream is None:
+        stream = camera_stream_manager.get_stream_by_name(name)
+    if stream is None:
+        abort(404)
+    decoder = stream["decoder"]
+
     i = 0
     while i < 100:
         last_frame = decoder.last_frame
