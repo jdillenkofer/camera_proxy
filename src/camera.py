@@ -23,8 +23,8 @@ class Camera:
         while self.is_running:
             try:
                 self._start_stream(handle_video_stream)
-            except socket.timeout:
-                logger.warning("Timeout occured! Reconnecting...")
+            except Exception as e:
+                logger.error("Exception occured: %s Trying to reconnect the camera stream...", e)
     
     def _start_stream(self, handle_video_stream):
         client_id = random.randint(0, MAX_INT32)
@@ -64,7 +64,7 @@ class Camera:
         video_stream = b''
 
         i = 0
-        udp_layer.socket.settimeout(7)
+        udp_layer.socket.settimeout(5)
         while self.is_running:
             (modern_message_id, _, message, binary_data) = control_layer.recv_packet()
             I_FRAME = 0x63643030
