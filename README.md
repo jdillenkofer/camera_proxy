@@ -33,4 +33,4 @@ python src/main.py
 ```
 
 ## License
-[MIT](https://choosealicense.com/licenses/mit/)
+[MIT](license.txt)
