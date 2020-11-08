@@ -61,9 +61,10 @@ def get_image_stream_from_camera(name):
             frame = queue.get()
             output = io.BytesIO()
             frame.save(output, 'JPEG')
+            len = output.tell()
             output.seek(0)
             yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\n\r\n' + output.read() + b'\r\n')
+                b'Content-Type: image/jpeg\r\nContent-Length: ' + str(len).encode() + b'\r\n\r' + output.read() + b'\r\n')
     return Response(frame_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/api/v1/cameras/<name>', methods=["GET"])
