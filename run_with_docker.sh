@@ -1,1 +1,1 @@
-docker run -d --restart unless-stopped --network host camera_proxy:1.1.0
+docker run -d --restart unless-stopped --network host camera_proxy:1.1.2
