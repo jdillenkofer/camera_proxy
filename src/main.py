@@ -96,10 +96,14 @@ def get_image_from_camera(name):
         else:
             time.sleep(0.1)
             i += 1
-    return send_file("../public/images/klingel.jpg")
+    backup_image = stream["backup_image"]
+    if backup_image != None:
+        return send_file(backup_image)
+    else:
+        abort(404)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='A small webserver to extract images from the reolink argus 2 camera.')
+    parser = argparse.ArgumentParser(description='A small webserver to extract images from reolink cameras.')
     parser.add_argument("--debug", dest="debug", action="store_true", help="Starts the server in debug mode.")
     parser.add_argument("--port", dest="port", help="Set the webserver port.", default=8000, type=int, choices=range(0,65536), metavar="{0..65535}")
     parser.set_defaults(debug=False)
