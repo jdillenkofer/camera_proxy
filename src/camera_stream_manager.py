@@ -21,6 +21,7 @@ class CameraStreamManager:
         device_sid = camera_settings["deviceSid"]
         username = camera_settings["username"]
         password = camera_settings["password"]
+        backup_image = camera_settings["backupImage"] if "backupImage" in camera_settings else None
         
         camera = Camera(device_sid, username, password)
         decoder = Decoder()
@@ -36,6 +37,7 @@ class CameraStreamManager:
         stream["camera_thread"] = camera_thread
         stream["decoder"] = decoder
         stream["last_accessed"] = datetime.now()
+        stream["backup_image"] = backup_image
         with self.stream_lock:
             self.streams.append(stream)
         return stream

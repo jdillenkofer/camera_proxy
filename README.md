@@ -20,7 +20,8 @@ Create a settings.json with one or more camera entries:
             "name": "camera1",
             "deviceSid": "12345678910ABC5D",
             "username": "admin",
-            "password": "password"
+            "password": "password",
+            "backupImage": "../public/images/klingel.jpg"
         }
     ]
 }
