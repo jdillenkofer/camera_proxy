@@ -1,1 +1,1 @@
-docker build . -t camera_proxy:1.1.2
+docker build . -t camera_proxy:1.1.3
