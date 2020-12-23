@@ -7,11 +7,7 @@ BAICHUAN_MESSAGE_ID_LOGIN = 0x01
 BAICHUAN_MESSAGE_ID_VIDEO = 0x03
 BAICHUAN_MESSAGE_ID_VIDEO_INPUT = 0x4e
 BAICHUAN_MESSAGE_ID_PING = 0x5d
-BAICHUAN_MESSAGE_ID_UNKNOWN = 0xea
-BAICHUAN_MESSAGE_ID_UNKNOWN2 = 0x4f
 BAICHUAN_MESSAGE_ID_BATTERY_INFO = 0xfc
-
-BAICHUAN_MESSAGE_IDS = [BAICHUAN_MESSAGE_ID_LOGIN, BAICHUAN_MESSAGE_ID_VIDEO, BAICHUAN_MESSAGE_ID_VIDEO_INPUT, BAICHUAN_MESSAGE_ID_PING, BAICHUAN_MESSAGE_ID_UNKNOWN, BAICHUAN_MESSAGE_ID_UNKNOWN2, BAICHUAN_MESSAGE_ID_BATTERY_INFO]
 
 MAINSTREAM = "mainStream"
 SUBSTREAM = "subStream"
@@ -30,8 +26,6 @@ class BaichuanControlLayer:
         self.udp_layer = udp_layer
         self.encryption_offset = 0
         self.modern_message_id_to_binary_mode = {}
-        for modern_message_id in BAICHUAN_MESSAGE_IDS:
-            self.modern_message_id_to_binary_mode[modern_message_id] = False
         self.recv_buffer = b''
     
     @staticmethod
@@ -142,6 +136,12 @@ class BaichuanControlLayer:
         else:
             packet = self.udp_layer.recv_packet()
         return packet
+
+    def set_binary_mode(self, modern_message_id, binary_mode):
+        self.modern_message_id_to_binary_mode[modern_message_id] = binary_mode
+    
+    def is_in_binary_mode(self, modern_message_id):
+        return (modern_message_id in self.modern_message_id_to_binary_mode) and self.modern_message_id_to_binary_mode[modern_message_id]
     
     def recv_packet(self):
         modern_message_id = None
@@ -150,9 +150,7 @@ class BaichuanControlLayer:
         binary_data = b''
         while True:
             packet = self._recv_next_udp_packet()
-            # if len(packet) < 20:
-                # packet += self._recv_next_udp_packet()
-            (magic, modern_message_id, message_len, encryption_offset, encrypted, unknown, message_class) = struct.unpack_from("<iIIIBBH", packet)
+            (magic, modern_message_id, message_len, encryption_offset, encrypted, _, message_class) = struct.unpack_from("<iIIIBBH", packet)
             self.encryption_offset = encryption_offset
             if magic != BAICHUAN_MAGIC:
                 break
@@ -161,10 +159,10 @@ class BaichuanControlLayer:
             if self.has_bin_offset(message_class):
                 (bin_offset, ) = struct.unpack_from("<I", packet[20:])
                 if bin_offset != 0:
-                    self.modern_message_id_to_binary_mode[modern_message_id] = True
+                    self.set_binary_mode(modern_message_id, True)
             
             max_packet_size = None
-            if self.modern_message_id_to_binary_mode[modern_message_id]:
+            if self.is_in_binary_mode(modern_message_id):
                 if bin_offset != 0:
                     message += packet[header_len:header_len+bin_offset]
                 max_packet_size = min(len(packet[header_len+bin_offset:]), message_len - len(message) - len(binary_data))
@@ -177,7 +175,7 @@ class BaichuanControlLayer:
             while len(message) + len(binary_data) < message_len:
                 packet = self._recv_next_udp_packet()
                 max_packet_size = min(len(packet), message_len - len(message) - len(binary_data))
-                if self.modern_message_id_to_binary_mode[modern_message_id]:
+                if self.is_in_binary_mode(modern_message_id):
                     binary_data += packet[:max_packet_size]
                 else:
                     message += packet[:max_packet_size]
@@ -190,7 +188,7 @@ class BaichuanControlLayer:
             xml_root = ElementTree.fromstring(str_message)
             binary_data_element = xml_root.find("binaryData")
             if binary_data_element != None:
-                self.modern_message_id_to_binary_mode[modern_message_id] = binary_data_element.text == "1"
+                self.set_binary_mode(modern_message_id, binary_data_element.text == "1")
         except:
             pass
         return (modern_message_id, message_class, message, binary_data)
