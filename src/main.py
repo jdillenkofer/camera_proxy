@@ -5,7 +5,7 @@ import logging
 import argparse
 import threading
 from datetime import datetime
-from queue import Queue
+from multiprocessing import Queue
 from flask import Flask, send_file, request, Response, abort
 from PIL import Image
 from camera_stream_manager import CameraStreamManager
@@ -40,8 +40,7 @@ def stop_camera_daemon():
 stop_camera_daemon_thread = threading.Thread(target=stop_camera_daemon, name="StopCameraDaemon", daemon=True)
 stop_camera_daemon_thread.start()
 
-@app.route('/api/v1/cameras/<name>/stream', methods=["GET"])
-def get_image_stream_from_camera(name):
+def start_camera_stream(name):
     camera_stream_manager.update_last_accessed_timestamp(name)
     stream = None
     if not camera_stream_manager.is_stream_running(name):
@@ -49,38 +48,44 @@ def get_image_stream_from_camera(name):
     
     if stream is None:
         stream = camera_stream_manager.get_stream_by_name(name)
+    return stream
+
+@app.route('/api/v1/cameras/<name>/stream', methods=["GET"])
+def get_image_stream_from_camera(name):
+    stream = start_camera_stream(name)
+    
     if stream is None:
         abort(404)
     decoder = stream["decoder"]
     queue = Queue()
-    decoder.add_frame_callback(lambda x: queue.put(x))
+    frame_callback = lambda x: queue.put(x)
+    decoder.add_frame_callback(frame_callback)
 
     def frame_generator():
-        while True:
-            camera_stream_manager.update_last_accessed_timestamp(name)
-            frame = queue.get()
-            output = io.BytesIO()
-            frame.save(output, 'JPEG')
-            len = output.tell()
-            output.seek(0)
-            yield (b'--frame\r\n'
-                b'Content-Type: image/jpeg\r\nContent-Length: ' + str(len).encode() + b'\r\n\r\n' + output.read() + b'\r\n')
+        try:
+            while True:
+                camera_stream_manager.update_last_accessed_timestamp(name)
+                logger.debug("Frame queue size %d", queue.qsize())
+                frame = queue.get()
+                output = io.BytesIO()
+                frame.save(output, 'JPEG')
+                len = output.tell()
+                output.seek(0)
+                yield (b'--frame\r\n'
+                    b'Content-Type: image/jpeg\r\nContent-Length: ' + str(len).encode() + b'\r\n\r\n' + output.read() + b'\r\n')
+        finally:
+            decoder.remove_frame_callback(frame_callback)
     return Response(frame_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/api/v1/cameras/<name>', methods=["GET"])
 def get_image_from_camera(name):
-    thumbnail_requested = request.args.get('thumbnail') != None
-
-    camera_stream_manager.update_last_accessed_timestamp(name)
-    stream = None
-    if not camera_stream_manager.is_stream_running(name):
-        stream = camera_stream_manager.start_decoding_camera_stream(name)
-
-    if stream is None:
-        stream = camera_stream_manager.get_stream_by_name(name)
+    stream = start_camera_stream(name)
+    
     if stream is None:
         abort(404)
     decoder = stream["decoder"]
+
+    thumbnail_requested = request.args.get('thumbnail') != None
 
     i = 0
     while i < 100:

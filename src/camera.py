@@ -18,15 +18,15 @@ class Camera:
         self.password = password
         self.is_running = False
 
-    def start(self, handle_video_stream):
+    def start(self, handle_video_and_audio_stream):
         self.is_running = True
         while self.is_running:
             try:
-                self._start_stream(handle_video_stream)
+                self._start_stream(handle_video_and_audio_stream)
             except Exception as e:
                 logger.error("Exception occured: %s Trying to reconnect the camera stream...", e)
     
-    def _start_stream(self, handle_video_stream):
+    def _start_stream(self, handle_video_and_audio_stream):
         client_id = random.randint(0, MAX_INT32)
 
         udp_layer = baichuan_udp_layer.BaichuanUdpLayer(self.device_sid, client_id)
@@ -62,6 +62,7 @@ class Camera:
         logger.info("Send start video cmd")
         control_layer.start_video(baichuan_control_layer.MAINSTREAM)
         video_stream = b''
+        audio_stream = b''
 
         i = 0
         udp_layer.socket.settimeout(5)
@@ -113,7 +114,7 @@ class Camera:
                     BC_AAC_FRAME_HEADER_SIZE = 8
                     (audio_magic, l_size, r_size) = struct.unpack_from("<iHH", binary_data)
                     logger.debug("AAC Frame found (l_size %d, r_size %d)", l_size, r_size)
-                    # audio_data = binary_data[BC_AAC_FRAME_HEADER_SIZE: BC_AAC_FRAME_HEADER_SIZE + l_size + r_size]
+                    audio_stream += binary_data[BC_AAC_FRAME_HEADER_SIZE: BC_AAC_FRAME_HEADER_SIZE + l_size + r_size]
                 else:
                     video_stream += binary_data
             elif modern_message_id == baichuan_control_layer.BAICHUAN_MESSAGE_ID_BATTERY_INFO:
@@ -124,13 +125,12 @@ class Camera:
                     logger.info("Battery Percentage: %s", battery_percent_element.text)
             elif modern_message_id == baichuan_control_layer.BAICHUAN_MESSAGE_ID_PING:
                 logger.debug("Received pong")
-                pass
             else:
-                logger.debug("Received unhandled message. modern_message_id: %d", modern_message_id)
-                pass
+                logger.debug("Received unknown message. modern_message_id: %d", modern_message_id)
 
-            handle_video_stream(video_stream)
+            handle_video_and_audio_stream(video_stream, audio_stream)
             video_stream = b''
+            audio_stream = b''
 
             if i % 16 == 0:
                 logger.debug("Sending ping")
