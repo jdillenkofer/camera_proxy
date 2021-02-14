@@ -4,8 +4,9 @@ import time
 import logging
 import argparse
 import threading
+import math
 from datetime import datetime
-from multiprocessing import Queue
+from SimpleQueue import SimpleQueue as Queue
 from flask import Flask, send_file, request, Response, abort
 from PIL import Image
 from camera_stream_manager import CameraStreamManager
@@ -107,6 +108,7 @@ def get_image_from_camera(name):
     else:
         abort(404)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A small webserver to extract images from reolink cameras.')
     parser.add_argument("--debug", dest="debug", action="store_true", help="Starts the server in debug mode.")
@@ -118,3 +120,5 @@ if __name__ == "__main__":
     port = args.port
     logging.basicConfig(level=logging.DEBUG if debug else logging.INFO)
     app.run(debug=debug, port=port, host='0.0.0.0')
+else:
+    logging.basicConfig(level=logging.DEBUG)
