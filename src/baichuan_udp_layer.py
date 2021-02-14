@@ -90,7 +90,7 @@ class BaichuanUdpLayer:
             self.p2p_discover()
         else:
             self.target_address = sender
-            self.socket.settimeout(None)
+            self.socket.settimeout(1)
     
     def p2p_discover(self):
         self.socket.settimeout(0.5) #P2P Discover can take more time to answer than locally
@@ -180,6 +180,8 @@ class BaichuanUdpLayer:
         self.device_id = device_id
         
         self._send_p2p_remote_connection(log_address) #Announce we will connect locally
+
+        self.socket.settimeout(1)
         
 
     @staticmethod    

@@ -6,7 +6,7 @@ import argparse
 import threading
 import math
 from datetime import datetime
-from SimpleQueue import SimpleQueue as Queue
+import Queue
 from flask import Flask, send_file, request, Response, abort
 from PIL import Image
 from camera_stream_manager import CameraStreamManager
@@ -70,19 +70,21 @@ def get_image_stream_from_camera(name):
             while True:
                 camera_stream_manager.update_last_accessed_timestamp(name)
 
-                frame = queue.get()
-                frame.save(output, 'JPEG')
-                len = output.tell()
-                output.seek(0)
-                
-                yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\nContent-Length: ' + str(len).encode() + b'\r\n\r\n' + output.read() + b'\r\n')
-                
-                #Reset output buffer
-                output.truncate()
-                output.seek(0)
+                frames = queue.get()
 
-                frameCounter += 1
+                for frame in frames:
+                    frame.save(output, 'JPEG')
+                    length = output.tell()
+                    output.seek(0)
+                    
+                    yield (b'--frame\r\n'
+                        b'Content-Type: image/jpeg\r\nContent-Length: ' + str(length).encode() + b'\r\n\r\n' + output.read() + b'\r\n')
+                    
+                    #Reset output buffer
+                    output.truncate()
+                    output.seek(0)
+
+                frameCounter += len(frames)
 
                 elapsed = (datetime.now() - lasFrameSentTime).total_seconds()
                 if elapsed >= 1:
