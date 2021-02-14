@@ -6,7 +6,7 @@ import argparse
 import threading
 import math
 from datetime import datetime
-from multiprocessing import SimpleQueue as Queue
+from SimpleQueue import SimpleQueue as Queue
 from flask import Flask, send_file, request, Response, abort
 from PIL import Image
 from camera_stream_manager import CameraStreamManager
