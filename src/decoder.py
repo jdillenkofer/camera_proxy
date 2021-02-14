@@ -1,6 +1,6 @@
 import av
 import logging
-from multiprocessing import Queue
+from multiprocessing import SimpleQueue as Queue
 
 logger = logging.getLogger(__name__)
 
@@ -38,5 +38,5 @@ class Decoder:
         self.running = False
 
     def queue_data(self, data):
-        self.queue.put_nowait(data)
+        self.queue.put(data)
         logger.debug("Decoder queue size %d", self.queue.qsize())
