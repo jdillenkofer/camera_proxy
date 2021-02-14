@@ -16,4 +16,4 @@ COPY ./public public
 
 EXPOSE 8000
 
-CMD ["python", "src/main.py", "--port", "9090"]
+CMD ["python", "src/main.py", "--port", "9090", "--debug"]
