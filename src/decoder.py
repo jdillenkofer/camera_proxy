@@ -1,6 +1,6 @@
 import av
 import logging
-import Queue
+from multiprocessing import Queue
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class Decoder:
             try:
                 data = self.queue.get()
                 
-                frames = [(frame.to_image() for frame in self.codec.decode(packet) if not frame.is_corrupt) for packet in self.codec.parse(data) if not packet.is_corrupt]
-
+                framesList = [list(frame.to_image() for frame in self.codec.decode(packet) if not frame.is_corrupt) for packet in self.codec.parse(data) if not packet.is_corrupt]
+                frames = [frame for frames in framesList for frame in frames]
                 if frames != None and len(frames) > 0:
                     for frame_callback in self.frame_callbacks:
                         frame_callback(frames)
@@ -38,5 +38,5 @@ class Decoder:
         self.running = False
 
     def queue_data(self, data):
-        self.queue.put(data)
+        self.queue.put_nowait(data)
         logger.debug("Decoder queue size %d", self.queue.qsize())
