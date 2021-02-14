@@ -1,4 +1,4 @@
-FROM python:3.6-buster
+FROM python:3.9.1-buster
 
 WORKDIR app
 
@@ -7,11 +7,13 @@ RUN apt-get install -y libavformat-dev libavdevice-dev libavcodec-dev libavfilte
 RUN pip install av
 RUN pip install flask
 RUN pip install pillow
+RUN pip install netifaces
 
 COPY ./src src
-COPY ./settings.json settings.json
+#COPY ./settings.json settings.json
+#settings.json must be provided by docker configs
 COPY ./public public
 
 EXPOSE 8000
 
-CMD ["python", "src/main.py"]
+CMD ["python", "src/main.py", "--port", "9090"]
