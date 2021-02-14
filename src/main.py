@@ -6,7 +6,7 @@ import argparse
 import threading
 import math
 from datetime import datetime
-import Queue
+from multiprocessing import Queue
 from flask import Flask, send_file, request, Response, abort
 from PIL import Image
 from camera_stream_manager import CameraStreamManager
@@ -35,7 +35,7 @@ def stop_camera_daemon():
                 last_accessed = stream["last_accessed"]
                 if (datetime.now() - last_accessed).total_seconds() > 30:
                     logger.info("Stopping camera stream %s", name)
-                    camera_stream_manager.stop_decoding_camera_stream(name)
+                    #camera_stream_manager.stop_decoding_camera_stream(name)
         time.sleep(5)
 
 stop_camera_daemon_thread = threading.Thread(target=stop_camera_daemon, name="StopCameraDaemon", daemon=True)
@@ -59,7 +59,7 @@ def get_image_stream_from_camera(name):
         abort(404)
     decoder = stream["decoder"]
     queue = Queue()
-    frame_callback = lambda x: queue.put(x)
+    frame_callback = lambda x: queue.put_nowait(x)
     decoder.add_frame_callback(frame_callback)
 
     def frame_generator():
@@ -71,7 +71,7 @@ def get_image_stream_from_camera(name):
                 camera_stream_manager.update_last_accessed_timestamp(name)
 
                 frames = queue.get()
-
+                
                 for frame in frames:
                     frame.save(output, 'JPEG')
                     length = output.tell()
