@@ -64,16 +64,33 @@ def get_image_stream_from_camera(name):
 
     def frame_generator():
         try:
+            output = io.BytesIO()
+            frameCounter = 0
+            lasFrameSentTime = datetime.now()
             while True:
                 camera_stream_manager.update_last_accessed_timestamp(name)
-                logger.debug("Frame queue size %d", queue.qsize())
+
                 frame = queue.get()
-                output = io.BytesIO()
                 frame.save(output, 'JPEG')
                 len = output.tell()
                 output.seek(0)
+                
                 yield (b'--frame\r\n'
                     b'Content-Type: image/jpeg\r\nContent-Length: ' + str(len).encode() + b'\r\n\r\n' + output.read() + b'\r\n')
+                
+                #Reset output buffer
+                output.truncate()
+                output.seek(0)
+
+                frameCounter += 1
+
+                elapsed = (datetime.now() - lasFrameSentTime).total_seconds()
+                if elapsed >= 1:
+                    logger.debug("Stream Queue Size: %d", queue.qsize())
+                    logger.info("FPS: %d", math.floor(frameCounter/elapsed))
+                    frameCounter = 0
+                    lasFrameSentTime = datetime.now()
+                
         finally:
             decoder.remove_frame_callback(frame_callback)
     return Response(frame_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
