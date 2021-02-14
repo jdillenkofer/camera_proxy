@@ -1,6 +1,6 @@
 import av
 import logging
-from multiprocessing import SimpleQueue as Queue
+from SimpleQueue import SimpleQueue as Queue
 
 logger = logging.getLogger(__name__)
 
