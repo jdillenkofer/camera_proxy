@@ -24,11 +24,11 @@ class Decoder:
             try:
                 data = self.queue.get()
                 
-                framesList = [list(frame.to_image() for frame in self.codec.decode(packet) if not frame.is_corrupt) for packet in self.codec.parse(data) if not packet.is_corrupt]
+                framesList = [list(frame.to_image() for frame in self.codec.decode(packet) if frame.is_corrupt == False ) for packet in self.codec.parse(data) if packet.is_corrupt == False]
                 frames = [frame for frames in framesList for frame in frames]
                 if frames != None and len(frames) > 0:
                     for frame_callback in self.frame_callbacks:
-                        frame_callback(frames)
+                        frame_callback(frames[:])
                     self.last_frame = frames[len(frames)-1]
                         
             except Exception as e:
