@@ -1,6 +1,6 @@
 import av
 import logging
-from SimpleQueue import SimpleQueue as Queue
+import Queue
 
 logger = logging.getLogger(__name__)
 
@@ -23,18 +23,14 @@ class Decoder:
         while self.running:
             try:
                 data = self.queue.get()
-                packets = self.codec.parse(data)
-                for packet in packets:
-                    if packet.is_corrupt:
-                        continue
-                    frames = self.codec.decode(packet)
-                    for frame in frames:
-                        if frame.is_corrupt:
-                            continue
-                        image = frame.to_image()
-                        for frame_callback in self.frame_callbacks:
-                            frame_callback(image)
-                        self.last_frame = image
+                
+                frames = [(frame.to_image() for frame in self.codec.decode(packet) if not frame.is_corrupt) for packet in self.codec.parse(data) if not packet.is_corrupt]
+
+                if frames != None and len(frames) > 0:
+                    for frame_callback in self.frame_callbacks:
+                        frame_callback(frames)
+                    self.last_frame = frames[len(frames)-1]
+                        
             except Exception as e:
                 print(e)
     
