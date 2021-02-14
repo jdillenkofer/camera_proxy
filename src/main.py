@@ -59,7 +59,7 @@ def get_image_stream_from_camera(name):
         abort(404)
     decoder = stream["decoder"]
     queue = Queue()
-    frame_callback = lambda x: queue.put_nowait(x)
+    frame_callback = lambda x: queue.put(x)
     decoder.add_frame_callback(frame_callback)
 
     def frame_generator():
