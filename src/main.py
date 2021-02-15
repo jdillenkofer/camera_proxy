@@ -150,7 +150,7 @@ if __name__ == "__main__":
     login_record_factory = logging.getLogRecordFactory()
     def record_factory(*args, **kwargs):
         record = login_record_factory(*args, **kwargs)
-        record.tid = gettid() if platform.system().startswith(u'linux') else record.thread
+        record.tid = gettid() if platform.system().startswith(u'Linux') else record.thread
         return record
 
     logging.setLogRecordFactory(record_factory)
