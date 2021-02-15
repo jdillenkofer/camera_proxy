@@ -134,6 +134,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     debug = args.debug
     port = args.port
-    logging.basicConfig(level=logging.DEBUG if debug else logging.INFO, format="[%(threadName)s-%(thread)s] %(message)s")
+    logging.basicConfig(level=logging.DEBUG if debug else logging.INFO, format="[%(process)s][%(threadName)s-%(thread)s] %(message)s")
     app.run(debug=debug, port=port, host='0.0.0.0')
 
