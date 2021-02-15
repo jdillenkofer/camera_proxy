@@ -125,6 +125,29 @@ def get_image_from_camera(name):
         abort(404)
 
 
+def patch_thread_identifier():
+    """Replace python thread identifier by TID."""
+    # Imports
+    import threading, ctypes
+    # Define get tid function
+    def gettid():
+        """Get TID as displayed by htop."""
+        libc = 'libc.so.6'
+        for cmd in (186, 224, 178):
+            tid = ctypes.CDLL(libc).syscall(cmd)
+            if tid != -1:
+                return tid
+    # Get current thread
+    current = threading.current_thread()
+    # Patch get_ident (or _get_ident in python 2)
+    threading.get_ident = threading._get_ident = gettid
+    # Update active dictionary
+    threading._active[gettid()] = threading._active.pop(current.ident)
+    # Set new identifier for the current thread
+    current._set_ident()
+    # Done
+    print("threading._get_ident patched!")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A small webserver to extract images from reolink cameras.')
     parser.add_argument("--debug", dest="debug", action="store_true", help="Starts the server in debug mode.")
@@ -134,6 +157,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     debug = args.debug
     port = args.port
+
+    if platform.system().startswith(u'linux'):
+        patch_thread_identifier()
+
     logging.basicConfig(level=logging.DEBUG if debug else logging.INFO, format="[%(process)s][%(threadName)s-%(thread)s] %(message)s")
     app.run(debug=debug, port=port, host='0.0.0.0')
 
