@@ -132,9 +132,10 @@ class Camera:
             video_stream = b''
             audio_stream = b''
 
-            if i % 16 == 0:
+            if i % 4 == 0:
                 logger.debug("Sending ping")
                 control_layer.ping()
+                i=0
             i += 1
 
     def stop(self):
