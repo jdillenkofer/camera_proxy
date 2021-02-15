@@ -93,6 +93,7 @@ class BaichuanUdpLayer:
             self.socket.settimeout(30)
     
     def p2p_discover(self):
+        logger.info("Send P2P Discovery message")
         self.socket.settimeout(0.5) #P2P Discover can take more time to answer than locally
         register_address = (None, None)
         relay_address = (None, None)
@@ -130,7 +131,7 @@ class BaichuanUdpLayer:
                     continue
             except socket.timeout:
                 continue
-        
+        logger.info("P2P - Register address found, %s:%d", register_address[0], register_address[1])
         client_id = None
         device_id = None
         while client_id != self.client_id:
@@ -178,6 +179,8 @@ class BaichuanUdpLayer:
                     continue
         
         self.device_id = device_id
+
+        logger.info("P2P - Devide ID received, %d", device_id)
         
         self._send_p2p_remote_connection(log_address) #Announce we will connect locally
 
