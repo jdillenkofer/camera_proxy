@@ -20,6 +20,7 @@ class Decoder:
     
     def process(self):
         self.running = True
+        logger.info("Decoder deamon started")
         while self.running:
             try:
                 data = self.queue.get()
@@ -31,8 +32,8 @@ class Decoder:
                         frame_callback(frames)
                     self.last_frame = frames[len(frames)-1]
                         
-            except Exception as e:
-                print(e)
+            except Exception as ex:
+                logger.warning("Unexpected exception occured: %s, Traceback = ".format(str(ex)), exc_info=True)
     
     def stop(self):
         self.running = False
