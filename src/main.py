@@ -64,7 +64,7 @@ def get_image_stream_from_camera(name):
 
     def frame_generator():
         try:
-            output = io.BytesIO()
+            
             frameCounter = 0
             lasFrameSentTime = datetime.now()
             while True:
@@ -73,16 +73,13 @@ def get_image_stream_from_camera(name):
                 frames = queue.get()
                 
                 for frame in frames:
+                    output = io.BytesIO()
                     frame.save(output, 'JPEG')
                     length = output.tell()
-                    output.seek(0)
                     
                     yield (b'--frame\r\n'
-                        b'Content-Type: image/jpeg\r\nContent-Length: ' + str(length).encode() + b'\r\n\r\n' + output.read() + b'\r\n')
+                        b'Content-Type: image/jpeg\r\nContent-Length: ' + str(length).encode() + b'\r\n\r\n' + output.getvalue() + b'\r\n')
                     
-                    #Reset output buffer
-                    output.truncate()
-                    output.seek(0)
 
                 frameCounter += len(frames)
 
