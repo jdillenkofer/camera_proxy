@@ -39,6 +39,7 @@ class Decoder:
     
     def stop(self):
         self.running = False
+        self.queue._count.release()
 
     def _log_queued_time(self):
         #logger.debug("Decoder queue size %d", self.queue.qsize())
@@ -46,7 +47,9 @@ class Decoder:
             elapsed = (datetime.now() - self.last_data_queued).total_seconds()
             if(elapsed >= 5):
                 logger.info("Decoder queue size: %d", self.queue.qsize())
-        self.last_data_queued = datetime.now() 
+                self.last_data_queued = datetime.now()
+        else:
+            self.last_data_queued = datetime.now()
 
     def queue_data(self, data):
         self.queue.put(data)
