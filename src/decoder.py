@@ -44,7 +44,7 @@ class Decoder:
                     self.last_frame = frames[len(frames)-1]
 
                 time_dispatch_frames = (datetime.now() - timing).total_seconds()
-                logging.info("Process timing. Acquire Lock: %.4fs, Frame Decoding: %.4fs, Dispatch frames: %.4fs", time_acquire_lock, time_parse_decode_frames, time_dispatch_frames)
+                logger.info("Process timing. Acquire Lock: %.4fs, Frame Decoding: %.4fs, Dispatch frames: %.4fs", time_acquire_lock, time_parse_decode_frames, time_dispatch_frames)
                         
             except Exception as ex:
                 logger.warning("Unexpected exception occured: %s, Traceback = ".format(str(ex)), exc_info=True)
