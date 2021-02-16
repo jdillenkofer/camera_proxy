@@ -4,7 +4,6 @@ import time
 import logging
 import argparse
 import threading
-import math
 import platform
 from datetime import datetime
 from SimpleQueue import SimpleQueue as Queue
@@ -36,7 +35,7 @@ def stop_camera_daemon():
                 last_accessed = stream["last_accessed"]
                 if (datetime.now() - last_accessed).total_seconds() > 30:
                     logger.info("Stopping camera stream %s", name)
-                    #camera_stream_manager.stop_decoding_camera_stream(name)
+                    camera_stream_manager.stop_decoding_camera_stream(name)
         time.sleep(5)
 
 stop_camera_daemon_thread = threading.Thread(target=stop_camera_daemon, name="StopCameraDaemon", daemon=True)
@@ -68,6 +67,7 @@ def get_image_stream_from_camera(name):
             
             frameCounter = 0
             lasFrameSentTime = datetime.now()
+            i = -1
             while True:
                 camera_stream_manager.update_last_accessed_timestamp(name)
 
@@ -86,10 +86,13 @@ def get_image_stream_from_camera(name):
 
                 elapsed = (datetime.now() - lasFrameSentTime).total_seconds()
                 if elapsed >= 1:
-                    logger.debug("Stream Queue Size: %d", queue.qsize())
-                    logger.info("FPS: %d", math.floor(frameCounter/elapsed))
+                    i+=1
+                    logger.info("FPS approx: %d", round(frameCounter/elapsed, 2))
                     frameCounter = 0
                     lasFrameSentTime = datetime.now()
+                    if i % 5:
+                        logger.info("Stream Queue Size: %d", queue.qsize())
+                        i=0
                 
         finally:
             decoder.remove_frame_callback(frame_callback)
