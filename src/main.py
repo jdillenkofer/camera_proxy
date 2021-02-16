@@ -6,7 +6,7 @@ import argparse
 import threading
 import platform
 from datetime import datetime
-from SimpleQueue import SimpleQueue as Queue
+from SimpleQueue import SimpleQueue as Queue, Empty
 from flask import Flask, send_file, request, Response, abort
 from PIL import Image
 from camera_stream_manager import CameraStreamManager
@@ -67,33 +67,31 @@ def get_image_stream_from_camera(name):
             
             frameCounter = 0
             lasFrameSentTime = datetime.now()
-            i = -1
             while True:
-                camera_stream_manager.update_last_accessed_timestamp(name)
+                try:
+                    camera_stream_manager.update_last_accessed_timestamp(name)
 
-                frames = queue.get()
-                
-                for frame in frames:
-                    output = io.BytesIO()
-                    frame.save(output, 'JPEG')
-                    length = output.tell()
+                    frames = queue.get(timeout=15)
                     
-                    yield (b'--frame\r\n'
-                        b'Content-Type: image/jpeg\r\nContent-Length: ' + str(length).encode() + b'\r\n\r\n' + output.getvalue() + b'\r\n')
-                    
+                    for frame in frames:
+                        output = io.BytesIO()
+                        frame.save(output, 'JPEG')
+                        length = output.tell()
+                        
+                        yield (b'--frame\r\n'
+                            b'Content-Type: image/jpeg\r\nContent-Length: ' + str(length).encode() + b'\r\n\r\n' + output.getvalue() + b'\r\n')
+                        
 
-                frameCounter += len(frames)
+                    frameCounter += len(frames)
 
-                elapsed = (datetime.now() - lasFrameSentTime).total_seconds()
-                if elapsed >= 1:
-                    i+=1
-                    logger.info("FPS approx: %d", round(frameCounter/elapsed, 2))
-                    frameCounter = 0
-                    lasFrameSentTime = datetime.now()
-                    if i % 5:
-                        logger.info("Stream Queue Size: %d", queue.qsize())
-                        i=0
-                
+                    elapsed = (datetime.now() - lasFrameSentTime).total_seconds()
+                    if elapsed >= 1:
+                        logger.info("FPS approx: %6.2f, Queue Size: %d", round(frameCounter/elapsed, 2), queue.qsize())
+                        frameCounter = 0
+                        lasFrameSentTime = datetime.now()
+                except Empty:
+                    time.sleep(0.1)
+                    continue             
         finally:
             decoder.remove_frame_callback(frame_callback)
     return Response(frame_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')

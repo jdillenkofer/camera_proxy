@@ -37,7 +37,7 @@ class SimpleQueue:
             raise ValueError("'timeout' must be a non-negative number")
         if not self._count.acquire(block, timeout):
             raise Empty
-        return self._queue.popleft()
+        return self._queue.popleft() if self._queue else None
 
     def put_nowait(self, item):
         '''Put an item into the queue without blocking.
