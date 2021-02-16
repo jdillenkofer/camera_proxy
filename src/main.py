@@ -86,7 +86,7 @@ def get_image_stream_from_camera(name):
 
                     elapsed = (datetime.now() - lasFrameSentTime).total_seconds()
                     if elapsed >= 1:
-                        logger.info("FPS approx: %6.2f, Queue Size: %d", round(frameCounter/elapsed, 2), queue.qsize())
+                        logger.info("FPS approx: %.2f, Queue Size: %d", round(frameCounter/elapsed, 2), queue.qsize())
                         frameCounter = 0
                         lasFrameSentTime = datetime.now()
                 except Empty:
