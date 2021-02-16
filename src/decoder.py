@@ -1,6 +1,7 @@
 import av
 import logging
 from SimpleQueue import SimpleQueue as Queue
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +12,7 @@ class Decoder:
         self.frame_callbacks = []
         self.queue = Queue()
         self.running = False
+        self.last_data_queued = None
 
     def add_frame_callback(self, frame_callback):
         self.frame_callbacks.append(frame_callback)
@@ -38,6 +40,14 @@ class Decoder:
     def stop(self):
         self.running = False
 
+    def _log_queued_time(self):
+        #logger.debug("Decoder queue size %d", self.queue.qsize())
+        if self.last_data_queued != None:
+            elapsed = (datetime.now() - self.last_data_queued).total_seconds()
+            if(elapsed >= 5):
+                logger.info("Decoder queue size: %d", self.queue.qsize())
+        self.last_data_queued = datetime.now() 
+
     def queue_data(self, data):
         self.queue.put(data)
-        logger.debug("Decoder queue size %d", self.queue.qsize())
+        self._log_queued_time()

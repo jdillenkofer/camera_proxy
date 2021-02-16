@@ -1,5 +1,6 @@
 import threading
 from collections import deque
+from queue import Empty, Full
 
 class SimpleQueue:
     '''Simple, unbounded FIFO queue.
