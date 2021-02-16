@@ -1,3 +1,4 @@
+from queue import Full
 import av
 import logging
 from SimpleQueue import SimpleQueue as Queue
@@ -10,7 +11,7 @@ class Decoder:
         self.codec = av.CodecContext.create('h264', 'r')
         self.last_frame = None
         self.frame_callbacks = []
-        self.queue = Queue()
+        self.queue = Queue(500)
         self.running = False
         self.last_data_queued = None
 
@@ -52,5 +53,9 @@ class Decoder:
             self.last_data_queued = datetime.now()
 
     def queue_data(self, data):
-        self.queue.put(data)
-        self._log_queued_time()
+        try:
+            self.queue.put(data)
+            self._log_queued_time()
+        except Full:
+            logger.info("Decoder queue size is FULL: %d", self.queue.qsize())
+

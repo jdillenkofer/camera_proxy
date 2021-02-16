@@ -2,7 +2,7 @@ import threading
 from collections import deque
 from queue import Empty, Full
 
-class SimpleQueue:
+class SimpleQueue():
     '''Simple, unbounded FIFO queue.
     This pure Python implementation is not reentrant.
     '''
@@ -11,8 +11,8 @@ class SimpleQueue:
     #  on threading.Condition), fairness is not part of the API contract.
     # This allows the C version to use a different implementation.
 
-    def __init__(self):
-        self._queue = deque()
+    def __init__(self, maxlen=None):
+        self._queue = deque(maxlen=maxlen)
         self._count = threading.Semaphore(0)
 
     def put(self, item, block=True, timeout=None):
@@ -20,6 +20,8 @@ class SimpleQueue:
         The optional 'block' and 'timeout' arguments are ignored, as this method
         never blocks.  They are provided for compatibility with the Queue class.
         '''
+        if self._queue.maxlen != None and len(self._queue) >= self._queue.maxlen:
+            raise Full
         self._queue.append(item)
         self._count.release()
 
