@@ -20,7 +20,7 @@ class Decoder:
         self.last_data_logged = None
         self.avg_process_time = 0
         self.reduction_factor = 1
-        self.last_data_queued = None
+        self.last_data_processed = None
 
     def add_frame_callback(self, frame_callback):
         self.frame_callbacks.append(frame_callback)
@@ -62,6 +62,7 @@ class Decoder:
                     timing = datetime.now()
                     self._dispatch_frames(frames)
                     timings[1].append((datetime.now() - timing).total_seconds())
+                    self.last_data_processed = datetime.now()
                     if self.queue.empty():
                         break
                     data = self.queue.get_nowait()
@@ -99,14 +100,14 @@ class Decoder:
         #According to the reduction factor, time spent for processing
         #return intervalving data to be queued
         
-        if self.reduction_factor == 1 or self.last_data_queued == None:
+        if self.reduction_factor == 1 or self.last_data_processed == None:
             return True
         
         if self.reduction_factor == 0:
             return False
         
         dt = datetime.now()
-        dt_delta = self.last_data_queued + timedelta(seconds=(self.avg_process_time/self.reduction_factor))
+        dt_delta = self.last_data_processed + timedelta(seconds=(self.avg_process_time/self.reduction_factor))
         delay = (dt - dt_delta).total_seconds()
 
         return delay >= 0
@@ -116,7 +117,6 @@ class Decoder:
             if (data == None or len(data) == 0) and not self._should_queue_data():
                 return
             self.queue.put(data)
-            self.last_data_queued = datetime.now()
             self._log_queued_time()
             self._calc_reduction_factor()
         except Full:
