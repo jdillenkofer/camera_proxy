@@ -59,9 +59,10 @@ class Decoder:
                     timing = datetime.now()
                     self._dispatch_frames(frames)
                     timings[1].append((datetime.now() - timing).total_seconds())
-                    if self.queue.empty() or data == None or len(data) == 0:
+                    if self.queue.empty():
                         break
                     data = self.queue.get_nowait()
+
 
                     
                 logger.info("Process - Acquire Lock: %.4fs, Frame Decoding: %.4fs, Dispatch frames: %.4fs, Dequeue Count: %d", time_acquire_lock, avg(timings[0]), avg(timings[1]), len(timings[1]))
@@ -85,6 +86,8 @@ class Decoder:
 
     def queue_data(self, data):
         try:
+            if data == None or len(data) == 0:
+                return
             self.queue.put(data)
             self._log_queued_time()
         except Full:
