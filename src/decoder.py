@@ -63,13 +63,15 @@ class Decoder:
                     self._dispatch_frames(frames)
                     timings[1].append((datetime.now() - timing).total_seconds())
                     self.last_data_processed = datetime.now()
+                    avg_decode_time = avg(timings[0])
+                    avg_dispatch_time = avg(timings[1])
+                    self.avg_process_time = avg_decode_time + avg_dispatch_time
+                    self._calc_reduction_factor()
                     if self.queue.empty():
                         break
                     data = self.queue.get_nowait()
 
-                avg_decode_time = avg(timings[0])
-                avg_dispatch_time = avg(timings[1])
-                self.avg_process_time = avg_decode_time + avg_dispatch_time
+                
                 logger.info("Process - Reduction Factor: %.2f, Acquire Lock: %.4fs, Frame Decoding: %.4fs, Dispatch frames: %.4fs, Dequeue Count: %d",self.reduction_factor, time_acquire_lock, avg_decode_time, avg_dispatch_time, len(timings[1]))
                         
             except Exception as ex:
@@ -99,25 +101,22 @@ class Decoder:
     def _should_queue_data(self):
         #According to the reduction factor, time spent for processing
         #return intervalving data to be queued
-        
+
         if self.reduction_factor == 1 or self.last_data_processed == None:
             return True
         
         if self.reduction_factor == 0:
             return False
-        
-        dt = datetime.now()
-        dt_delta = self.last_data_processed + timedelta(seconds=(self.avg_process_time/self.reduction_factor))
-        delay = (dt - dt_delta).total_seconds()
 
-        return delay >= 0
+        dt_delta = self.last_data_processed + (timedelta(seconds=self.queue.qsize()*(self.avg_process_time/self.reduction_factor)))
+
+        return datetime.now() > dt_delta
 
     def queue_data(self, data):
         try:
-            if (data == None or len(data) == 0) and not self._should_queue_data():
+            if (data == None or len(data) == 0) or not self._should_queue_data():
                 return
             self.queue.put(data)
             self._log_queued_time()
-            self._calc_reduction_factor()
         except Full:
             logger.info("Decoder queue size is FULL: %d", self.queue.qsize())
