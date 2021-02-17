@@ -13,6 +13,7 @@ class SimpleQueue():
 
     def __init__(self, maxlen=None):
         self._queue = deque(maxlen=maxlen)
+        self.maxlen = maxlen
         self._count = threading.Semaphore(0)
 
     def put(self, item, block=True, timeout=None):
