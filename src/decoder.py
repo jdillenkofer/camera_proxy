@@ -17,9 +17,10 @@ class Decoder:
         self.frame_callbacks = []
         self.queue = Queue(500)
         self.running = False
-        self.last_data_queued = None
+        self.last_data_logged = None
         self.avg_process_time = 0
         self.reduction_factor = 1
+        self.last_data_queued = None
 
     def add_frame_callback(self, frame_callback):
         self.frame_callbacks.append(frame_callback)
@@ -79,13 +80,13 @@ class Decoder:
 
     def _log_queued_time(self):
         #logger.debug("Decoder queue size %d", self.queue.qsize())
-        if self.last_data_queued != None:
-            elapsed = (datetime.now() - self.last_data_queued).total_seconds()
+        if self.last_data_logged != None:
+            elapsed = (datetime.now() - self.last_data_logged).total_seconds()
             if(elapsed >= 5):
                 logger.info("Decoder queue size: %d", self.queue.qsize())
-                self.last_data_queued = datetime.now()
+                self.last_data_logged = datetime.now()
         else:
-            self.last_data_queued = datetime.now()
+            self.last_data_logged = datetime.now()
 
     def _calc_reduction_factor(self):
         #Calculte the reduction factor in order to keep the queue balanced to distach data
@@ -98,8 +99,11 @@ class Decoder:
         #According to the reduction factor, time spent for processing
         #return intervalving data to be queued
         
-        if self.reduction_factor == 1:
+        if self.reduction_factor == 1 or self.last_data_queued == None:
             return True
+        
+        if self.reduction_factor == 0:
+            return False
         
         dt = datetime.now()
         dt_delta = self.last_data_queued + timedelta(seconds=(self.avg_process_time/self.reduction_factor))
@@ -112,6 +116,7 @@ class Decoder:
             if (data == None or len(data) == 0) and not self._should_queue_data():
                 return
             self.queue.put(data)
+            self.last_data_queued = datetime.now()
             self._log_queued_time()
             self._calc_reduction_factor()
         except Full:
