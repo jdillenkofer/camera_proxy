@@ -5,9 +5,7 @@ Camera Proxy is a Python webserver which can display a video stream from the reo
 ## Dependencies
 
 ```console
-pip install av
-pip install flask
-pip install pillow
+pip install -r requirements.txt
 ```
 
 ## Usage
