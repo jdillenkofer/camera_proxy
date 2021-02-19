@@ -4,8 +4,9 @@ import time
 import logging
 import argparse
 import threading
+import platform
 from datetime import datetime
-from multiprocessing import Queue
+from SimpleQueue import SimpleQueue as Queue, Empty
 from flask import Flask, send_file, request, Response, abort
 from PIL import Image
 from camera_stream_manager import CameraStreamManager
@@ -63,16 +64,34 @@ def get_image_stream_from_camera(name):
 
     def frame_generator():
         try:
+            
+            frameCounter = 0
+            lasFrameSentTime = datetime.now()
             while True:
-                camera_stream_manager.update_last_accessed_timestamp(name)
-                logger.debug("Frame queue size %d", queue.qsize())
-                frame = queue.get()
-                output = io.BytesIO()
-                frame.save(output, 'JPEG')
-                len = output.tell()
-                output.seek(0)
-                yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\nContent-Length: ' + str(len).encode() + b'\r\n\r\n' + output.read() + b'\r\n')
+                try:
+                    camera_stream_manager.update_last_accessed_timestamp(name)
+
+                    frames = queue.get(timeout=15)
+                    
+                    for frame in frames:
+                        output = io.BytesIO()
+                        frame.save(output, 'JPEG')
+                        length = output.tell()
+                        
+                        yield (b'--frame\r\n'
+                            b'Content-Type: image/jpeg\r\nContent-Length: ' + str(length).encode() + b'\r\n\r\n' + output.getvalue() + b'\r\n')
+                        
+
+                    frameCounter += len(frames)
+
+                    elapsed = (datetime.now() - lasFrameSentTime).total_seconds()
+                    if elapsed >= 1:
+                        logger.info("FPS approx: %.2f, Queue Size: %d", round(frameCounter/elapsed, 2), queue.qsize())
+                        frameCounter = 0
+                        lasFrameSentTime = datetime.now()
+                except Empty:
+                    time.sleep(0.1)
+                    continue             
         finally:
             decoder.remove_frame_callback(frame_callback)
     return Response(frame_generator(), mimetype='multipart/x-mixed-replace; boundary=frame')
@@ -116,5 +135,26 @@ if __name__ == "__main__":
     args = parser.parse_args()
     debug = args.debug
     port = args.port
-    logging.basicConfig(level=logging.DEBUG if debug else logging.INFO)
+
+    logging.basicConfig(level=logging.DEBUG if debug else logging.INFO, format="[%(threadName)s-%(tid)s] %(message)s")
+
+    import threading, ctypes
+    # Define get tid function
+    def gettid():
+        """Get TID as displayed by htop."""
+        libc = 'libc.so.6'
+        for cmd in (186, 224, 178):
+            tid = ctypes.CDLL(libc).syscall(cmd)
+            if tid != -1:
+                return tid
+
+    login_record_factory = logging.getLogRecordFactory()
+    def record_factory(*args, **kwargs):
+        record = login_record_factory(*args, **kwargs)
+        record.tid = gettid() if platform.system().startswith(u'Linux') else record.thread
+        return record
+
+    logging.setLogRecordFactory(record_factory)
+
     app.run(debug=debug, port=port, host='0.0.0.0')
+

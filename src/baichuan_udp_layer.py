@@ -1,8 +1,10 @@
 import math
+import random
 import socket
 import struct
 import logging
 import xml.etree.ElementTree as ElementTree
+import netifaces;
 
 logger = logging.getLogger(__name__)
 
@@ -10,8 +12,28 @@ UDP_MESSAGE_ID_CTRL = 0x2a87cf10
 UDP_MESSAGE_ID_ACK = 0x2a87cf20
 UDP_MESSAGE_ID_DISCOVERY = 0x2a87cf3a
 
+DISCOVERY_PORT_START=50000
+DISCOVERY_PORT_END=60000
+
 CLIENT_OS = 'WIN'
 ETHERNET_MTU = 1350
+#TODO:Find the right interface for internet & local lan
+GATEWAYS = netifaces.gateways()
+DEFAULT_GATEWAY_ADDRESS = None if GATEWAYS == None or GATEWAYS['default'] == None else GATEWAYS['default'][netifaces.AF_INET]
+BINDING_IFACE_IP = '' if DEFAULT_GATEWAY_ADDRESS == None else netifaces.ifaddresses(DEFAULT_GATEWAY_ADDRESS[1])[netifaces.AF_INET][0]['addr']
+
+P2P_RELAY_HOSTS = [
+    socket.gethostbyname("p2p.reolink.com"),
+    socket.gethostbyname("p2p1.reolink.com"),
+    socket.gethostbyname("p2p2.reolink.com"),
+    socket.gethostbyname("p2p3.reolink.com"),
+    socket.gethostbyname("p2p14.reolink.com"),
+    socket.gethostbyname("p2p15.reolink.com"),
+    socket.gethostbyname("p2p6.reolink.com"),
+    socket.gethostbyname("p2p7.reolink.com"),
+    socket.gethostbyname("p2p8.reolink.com"),
+    socket.gethostbyname("p2p9.reolink.com")
+]
 
 class BaichuanUdpLayer:
     def __init__(self, device_sid, client_id, communication_port=0):
@@ -19,21 +41,26 @@ class BaichuanUdpLayer:
         self.client_id = client_id
         self.device_id = None
         self.communication_port = communication_port
-        self.discovery_src_port = 50749
+        self.discovery_src_port = DISCOVERY_PORT_START
+        self.connection_id = -1
         self.last_send_packet_id = 0
         self.last_received_packet_id = -1
         self.target_address = (None, None)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        server_address = ('', self.communication_port)
+        server_address = (BINDING_IFACE_IP, self.communication_port)
         self.socket.bind(server_address)
         self.communication_port = self.socket.getsockname()[1]
         self.unack_messages = {}
+        #Generate new client ID to say the cammera that instance is a a new client to broadcast information
+        self.tid = random.randint(0, 4000)
     
     def discover_device(self):
         self.socket.settimeout(0.2)
+        retry = 25
         sender = (None, None)
         client_id = None
-        while client_id != self.client_id:
+        while client_id != self.client_id and retry >= 0:
+            retry -= 1
             logger.info("Sending discovery packet")
             self._send_discovery_broadcast()
             try:
@@ -58,8 +85,110 @@ class BaichuanUdpLayer:
             except socket.timeout:
                 continue
             logger.info("Received discovery packet answer from %s", sender[0])
-        self.target_address = sender
-        self.socket.settimeout(None)
+
+        if retry <= 0:
+            self.p2p_discover()
+        else:
+            self.target_address = sender
+            self.socket.settimeout(30)
+    
+    def p2p_discover(self):
+        logger.info("Send P2P Discovery message")
+        self.socket.settimeout(0.5) #P2P Discover can take more time to answer than locally
+        register_address = (None, None)
+        relay_address = (None, None)
+        device_address = (None, None)
+        log_address = (None, None)
+        endpoint_address = (None, None)
+        index = -1
+        while True:                
+            index += 1  
+            if index >= len(P2P_RELAY_HOSTS):
+                raise "No P2P host available to register"
+            host = P2P_RELAY_HOSTS[index]
+            self._send_p2p_discovery(host)
+            try:
+                data, sender = self.socket.recvfrom(4096)
+                (udp_message_id, size, unknown, tid, checksum) = struct.unpack_from("<iIIiI", data)
+                if udp_message_id != UDP_MESSAGE_ID_DISCOVERY:
+                    continue
+                message = data[20:20+size]
+                actual_checksum = self.calc_crc(message)
+                if checksum != actual_checksum:
+                    logger.warn("Invalid checksum - expected: %d actual: %d", checksum, actual_checksum)
+                    continue
+                message = self.de_or_encrypt_udp_message(message, tid).decode("utf-8")
+                xml_root = ElementTree.fromstring(message)
+                register_address = (xml_root.find("M2C_Q_R/reg/ip"), xml_root.find("M2C_Q_R/reg/port"))
+                relay_address = (xml_root.find("M2C_Q_R/relay/ip"), xml_root.find("M2C_Q_R/relay/port"))
+                log_address = (xml_root.find("M2C_Q_R/log/ip"), xml_root.find("M2C_Q_R/log/port"))
+                endpoint_address = (xml_root.find("M2C_Q_R/t/ip"), xml_root.find("M2C_Q_R/t/port"))
+                if register_address[0] != None and relay_address[0] != None:
+                    register_address = (register_address[0].text, int(register_address[1].text))
+                    relay_address = (relay_address[0].text, int(relay_address[1].text))
+                    log_address = (log_address[0].text, int(log_address[1].text))
+                    endpoint_address = (endpoint_address[0].text, int(endpoint_address[1].text))
+                    break
+                else:
+                    continue
+            except socket.timeout:
+                continue
+        logger.info("P2P - Register address found, %s:%d", register_address[0], register_address[1])
+        client_id = None
+        device_id = None
+        while client_id != self.client_id:
+            self._send_p2p_register(register_address, relay_address)
+            while device_id == None:
+                try:
+                    data, sender = self.socket.recvfrom(4096)
+                    (udp_message_id, size, unknown, tid, checksum) = struct.unpack_from("<iIIiI", data)
+                    if udp_message_id != UDP_MESSAGE_ID_DISCOVERY:
+                        continue
+                    message = data[20:20+size]
+                    actual_checksum = self.calc_crc(message)
+                    if checksum != actual_checksum:
+                        logger.warn("Invalid checksum - expected: %d actual: %d", checksum, actual_checksum)
+                        continue
+                    message = self.de_or_encrypt_udp_message(message, tid).decode("utf-8")
+                    xml_root = ElementTree.fromstring(message)
+                    device_address_element = (xml_root.find("R2C_T/dev/ip"), xml_root.find("R2C_T/dev/port"))
+                    cid_element = xml_root.find("R2C_T/cid")
+                    connection_id_element = xml_root.find("R2C_T/sid")
+                    connection_id_element = xml_root.find("D2C_T/sid") if connection_id_element == None else connection_id_element
+                    cid_element = xml_root.find("D2C_T/cid") if cid_element == None else cid_element
+                    device_element = xml_root.find("D2C_T/did")                    
+                    if device_element == None:
+                        device_element = xml_root.find("D2C_CFM/did")
+                        cid_element = xml_root.find("D2C_CFM/cid") if cid_element == None else cid_element
+                    if device_element == None:
+                        device_element = xml_root.find("D2C_DISC/did")
+                        cid_element = xml_root.find("D2C_DISC/cid") if cid_element == None else cid_element
+
+                    if device_address_element[0] != None and cid_element != None and int(cid_element.text) == self.client_id and connection_id_element != None:
+                        device_address = (device_address_element[0].text, int(device_address_element[1].text))
+                        self.connection_id = int(connection_id_element.text)
+                        self.target_address = device_address
+                        self._send_p2p_local_connection()
+                        client_id = int(cid_element.text)
+                        if device_id != None:
+                            break
+                    if device_element != None and cid_element != None and int(cid_element.text) == self.client_id:
+                        device_id = int(device_element.text)
+                        client_id = int(cid_element.text)
+                        if device_address[0] != None:
+                            break
+                except socket.timeout:
+                    continue
+        
+        self.device_id = device_id
+
+        logger.info("P2P - Devide ID received, %d", device_id)
+        
+        self._send_p2p_remote_connection(log_address) #Announce we will connect locally
+        self._send_p2p_dmap_connection(endpoint_address) #Announce we could connect remotely
+
+        self.socket.settimeout(1)
+        
 
     @staticmethod    
     def calc_crc(message):
@@ -177,27 +306,117 @@ class BaichuanUdpLayer:
 
         self.socket.sendto(packet, self.target_address)
 
-    def _send_discovery_broadcast(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        server_address = ('', self.discovery_src_port)
-        sock.bind(server_address)
+    def _send_p2p_discovery(self, host):
 
-        xml_body = f"<P2P>\n<C2D_C>\n<uid>{self.device_sid}</uid>\n<cli>\n<port>{self.communication_port}</port>\n</cli>\n<cid>{self.client_id}</cid>\n<mtu>{ETHERNET_MTU}</mtu>\n<debug>{0}</debug>\n<p>{CLIENT_OS}</p>\n</C2D_C>\n</P2P>\n"
+        xml_body = f"<P2P>\n<C2M_Q>\n<uid>{self.device_sid}</uid>\n<p>{CLIENT_OS}</p>\n</C2M_Q>\n</P2P>\n"
         xml_bytes = xml_body.encode("utf-8")
 
-        tid = 3290
-        enc_xml_bytes = self.de_or_encrypt_udp_message(xml_bytes, tid)
+        enc_xml_bytes = self.de_or_encrypt_udp_message(xml_bytes, self.tid)
         checksum = self.calc_crc(enc_xml_bytes)
 
         discovery_message = b''
         discovery_message += UDP_MESSAGE_ID_DISCOVERY.to_bytes(4, 'little')
         discovery_message += len(xml_bytes).to_bytes(4, 'little')
         discovery_message += bytes([ 0x01, 0x00, 0x00, 0x00 ])
-        discovery_message += tid.to_bytes(4, 'little')
+        discovery_message += self.tid.to_bytes(4, 'little')
+        discovery_message += checksum.to_bytes(4, 'little')
+        discovery_message += enc_xml_bytes
+
+        self.socket.sendto(discovery_message, (host, 9999))
+
+    def _send_p2p_register(self, register_address, relay_address):
+        xml_body = f"<P2P>\n<C2R_C>\n<uid>{self.device_sid}</uid>\n<cli>\n<ip>{BINDING_IFACE_IP}</ip>\n<port>{self.communication_port}</port>\n</cli>\n<relay>\n<ip>{relay_address[0]}</ip>\n<port>{relay_address[1]}</port>\n</relay>\n<cid>{self.client_id}</cid>\n<debug>{0}</debug>\n<family>4</family>\n<p>{CLIENT_OS}</p>\n</C2R_C>\n</P2P>\n"
+        xml_bytes = xml_body.encode("utf-8")
+
+        enc_xml_bytes = self.de_or_encrypt_udp_message(xml_bytes, self.tid)
+        checksum = self.calc_crc(enc_xml_bytes)
+
+        discovery_message = b''
+        discovery_message += UDP_MESSAGE_ID_DISCOVERY.to_bytes(4, 'little')
+        discovery_message += len(xml_bytes).to_bytes(4, 'little')
+        discovery_message += bytes([ 0x01, 0x00, 0x00, 0x00 ])
+        discovery_message += self.tid.to_bytes(4, 'little')
+        discovery_message += checksum.to_bytes(4, 'little')
+        discovery_message += enc_xml_bytes
+
+        self.socket.sendto(discovery_message, register_address)
+
+    def _send_p2p_local_connection(self):
+
+        xml_body = f"<P2P>\n<C2D_T>\n<sid>{self.connection_id}</sid>\n<conn>local</conn>\n<cid>{self.client_id}</cid>\n<mtu>{ETHERNET_MTU}</mtu>\n</C2D_T>\n</P2P>\n"
+        xml_bytes = xml_body.encode("utf-8")
+
+        enc_xml_bytes = self.de_or_encrypt_udp_message(xml_bytes, self.tid)
+        checksum = self.calc_crc(enc_xml_bytes)
+
+        discovery_message = b''
+        discovery_message += UDP_MESSAGE_ID_DISCOVERY.to_bytes(4, 'little')
+        discovery_message += len(xml_bytes).to_bytes(4, 'little')
+        discovery_message += bytes([ 0x01, 0x00, 0x00, 0x00 ])
+        discovery_message += self.tid.to_bytes(4, 'little')
+        discovery_message += checksum.to_bytes(4, 'little')
+        discovery_message += enc_xml_bytes
+
+        self.socket.sendto(discovery_message, self.target_address)
+
+    def _send_p2p_remote_connection(self, log_address):
+        xml_body = f"<P2P>\n<C2R_CFM>\n<sid>{self.connection_id}</sid>\n<conn>local</conn>\n<rsp>0</rsp>\n<cid>{self.client_id}</cid>\n<did>{self.device_id}</did>\n</C2R_CFM>\n</P2P>\n"
+        xml_bytes = xml_body.encode("utf-8")
+
+        enc_xml_bytes = self.de_or_encrypt_udp_message(xml_bytes, self.tid)
+        checksum = self.calc_crc(enc_xml_bytes)
+
+        discovery_message = b''
+        discovery_message += UDP_MESSAGE_ID_DISCOVERY.to_bytes(4, 'little')
+        discovery_message += len(xml_bytes).to_bytes(4, 'little')
+        discovery_message += bytes([ 0x01, 0x00, 0x00, 0x00 ])
+        discovery_message += self.tid.to_bytes(4, 'little')
+        discovery_message += checksum.to_bytes(4, 'little')
+        discovery_message += enc_xml_bytes
+
+        self.socket.sendto(discovery_message, log_address)
+
+    def _send_p2p_dmap_connection(self, enpoint_address):
+        xml_body = f"<P2P>\n<C2D_T>\n<sid>{self.connection_id}</sid>\n<conn>map</conn>\n<rsp>0</rsp>\n<cid>{self.client_id}</cid>\n<mtu>{ETHERNET_MTU}</mtu>\n</C2D_T>\n</P2P>\n"
+        xml_bytes = xml_body.encode("utf-8")
+
+        enc_xml_bytes = self.de_or_encrypt_udp_message(xml_bytes, self.tid)
+        checksum = self.calc_crc(enc_xml_bytes)
+
+        discovery_message = b''
+        discovery_message += UDP_MESSAGE_ID_DISCOVERY.to_bytes(4, 'little')
+        discovery_message += len(xml_bytes).to_bytes(4, 'little')
+        discovery_message += bytes([ 0x01, 0x00, 0x00, 0x00 ])
+        discovery_message += self.tid.to_bytes(4, 'little')
+        discovery_message += checksum.to_bytes(4, 'little')
+        discovery_message += enc_xml_bytes
+
+        self.socket.sendto(discovery_message, enpoint_address)
+
+    def _send_discovery_broadcast(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        server_address = (BINDING_IFACE_IP, self.discovery_src_port)
+        sock.bind(server_address)
+
+        xml_body = f"<P2P>\n<C2D_C>\n<uid>{self.device_sid}</uid>\n<cli>\n<port>{self.communication_port}</port>\n</cli>\n<cid>{self.client_id}</cid>\n<mtu>{ETHERNET_MTU}</mtu>\n<debug>{0}</debug>\n<p>{CLIENT_OS}</p>\n</C2D_C>\n</P2P>\n"
+        xml_bytes = xml_body.encode("utf-8")
+
+        enc_xml_bytes = self.de_or_encrypt_udp_message(xml_bytes, self.tid)
+        checksum = self.calc_crc(enc_xml_bytes)
+
+        discovery_message = b''
+        discovery_message += UDP_MESSAGE_ID_DISCOVERY.to_bytes(4, 'little')
+        discovery_message += len(xml_bytes).to_bytes(4, 'little')
+        discovery_message += bytes([ 0x01, 0x00, 0x00, 0x00 ])
+        discovery_message += self.tid.to_bytes(4, 'little')
         discovery_message += checksum.to_bytes(4, 'little')
         discovery_message += enc_xml_bytes
         
         remote_address = ("255.255.255.255", 2015)
         sock.sendto(discovery_message, remote_address)
+        
+        if self.discovery_src_port >= DISCOVERY_PORT_END:
+            self.discovery_src_port = DISCOVERY_PORT_START - 1
+
         self.discovery_src_port += 1
