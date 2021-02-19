@@ -4,16 +4,16 @@ WORKDIR app
 
 RUN apt-get update
 RUN apt-get install -y libavformat-dev libavdevice-dev libavcodec-dev libavfilter-dev libavutil-dev libswscale-dev libswresample-dev
-RUN pip install av
-RUN pip install flask
-RUN pip install pillow
-RUN pip install netifaces
+
+COPY ./requirements.txt requirements.txt
+
+RUN pip install -r requirements.txt
 
 COPY ./src src
-#COPY ./settings.json settings.json
-#settings.json must be provided by docker configs
 COPY ./public public
 
-EXPOSE 8000
+# settings.json must be provided by docker configs
+
+EXPOSE 9090
 
 CMD ["python", "src/main.py", "--port", "9090"]
