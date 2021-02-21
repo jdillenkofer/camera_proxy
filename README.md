@@ -42,6 +42,14 @@ Cameras tested or reported working.
 # How to use it?
 The application can be executed within a Docker container or from any environment with Python.
 
+## Endpoints
+As soon as the application is running the folowwing endpoints are available.
+
+ > /api/v1/cameras/{camera_name} \
+ > /api/v1/cameras/{camera_name}/stream
+
+Details : [api-swagger.yaml](docs/api-swagger.yaml)
+
 ## Docker
 The Baichuan protocol uses broadcast requests within the camera network for the initial discovery. \
 Meaning the container must run within the network `Host`.
@@ -116,7 +124,7 @@ Run the following commande at `docker-compose.yml` location.
 $ docker-compose up
 ```
 
-Then open a web browser to `http://YOUR_DOCKER_SERVER_IP:9090/api/v1/cameras/camera1`
+Open a web browser to `http://YOUR_DOCKER_SERVER_IP:9090/api/v1/cameras/camera1`
 
 __Important note__: the **camera name** is **CASE SENSITIVE**.
 

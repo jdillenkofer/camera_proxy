@@ -1,0 +1,51 @@
+swagger: "2.0"
+info:
+  description: "Camera proxy API for Reolink cameras with Baichuan protocol"
+  version: "1.1.0"
+  title: "Swagger Petstore"
+host: "YOUR_SERVER_IP:9090"
+basePath: "/api/v1"
+schemes:
+- "http"
+paths:
+  /cameras/{camera_name}:
+    get:
+      summary: "Get the last camera frame"
+      description: ""
+      operationId: "getLastCameraFrame"
+      consumes:
+      - "application/json"
+      - "application/xml"
+      produces:
+      - "image/jpeg"
+      parameters: 
+      - in: "path"
+        name: "camera_name"
+        required: true
+        type: "string"
+        description: "*CASE SENSISTIVE, Camera name used within 'settings.json'"
+      responses:
+        "200":
+          description: ""
+          
+  /cameras/{camera_name}/stream:
+    get:
+      summary: "Get the MJPEAG Video stream"
+      description: ""
+      operationId: "getCameraStream"
+      consumes:
+      - "application/json"
+      - "application/xml"
+      produces:
+      - "multipart/x-mixed-replace; boundary=frame"
+      parameters: 
+      - in: "path"
+        name: "camera_name"
+        required: true
+        type: "string"
+        description: "*CASE SENSISTIVE, Camera name used within 'settings.json'"
+      responses:
+        "200":
+          description: ""
+    
+        
