@@ -43,6 +43,7 @@ class Decoder:
         logger.info("Decoder deamon started")
         while self.running:
             try:
+                
                 timing = datetime.now()
 
                 data = self.queue.get()
@@ -67,12 +68,13 @@ class Decoder:
                     avg_dispatch_time = avg(timings[1])
                     self.avg_process_time = avg_decode_time + avg_dispatch_time
                     self._calc_reduction_factor()
+                    self._log_timings()
                     if self.queue.empty():
                         break
                     data = self.queue.get_nowait()
 
                 
-                logger.info("Process - Reduction Factor: %.2f, Acquire Lock: %.4fs, Frame Decoding: %.4fs, Dispatch frames: %.4fs, Dequeue Count: %d",self.reduction_factor, time_acquire_lock, avg_decode_time, avg_dispatch_time, len(timings[1]))
+                logger.debug("Process - Reduction Factor: %.2f, Acquire Lock: %.4fs, Frame Decoding: %.4fs, Dispatch frames: %.4fs, Dequeue Count: %d",self.reduction_factor, time_acquire_lock, avg_decode_time, avg_dispatch_time, len(timings[1]))
                         
             except Exception as ex:
                 logger.warning("Unexpected exception occured: %s, Traceback = ".format(str(ex)), exc_info=True)
@@ -81,18 +83,17 @@ class Decoder:
         self.running = False
         self.queue._count.release()
 
-    def _log_queued_time(self):
-        #logger.debug("Decoder queue size %d", self.queue.qsize())
+    def _log_timings(self):
         if self.last_data_logged != None:
             elapsed = (datetime.now() - self.last_data_logged).total_seconds()
             if(elapsed >= 5):
-                logger.info("Decoder queue size: %d", self.queue.qsize())
+                logger.info("Decoder - Reduction Factor: %.2f, Queue size: %d, Processing time avg: %.4fs", self.reduction_factor, self.queue.qsize(), self.avg_process_time)
                 self.last_data_logged = datetime.now()
         else:
             self.last_data_logged = datetime.now()
 
     def _calc_reduction_factor(self):
-        #Calculte the reduction factor in order to keep the queue balanced to distach data
+        #Calculate the reduction factor in order to keep the queue balanced to distach data
         q_maxlen = self.queue.maxlen
         q_len = self.queue.qsize()
         q_percent_full = q_len/q_maxlen
@@ -101,7 +102,7 @@ class Decoder:
     def _should_queue_data(self):
         #According to the reduction factor, time spent for processing
         #return intervalving data to be queued
-
+        #TODO: For the next feature, enhance the calculation in order to select proper frames to drop (Intra-coded and/or Predicted ones)
         if self.reduction_factor == 1 or self.last_data_processed == None:
             return True
         
@@ -117,6 +118,5 @@ class Decoder:
             if (data == None or len(data) == 0) or not self._should_queue_data():
                 return
             self.queue.put(data)
-            self._log_queued_time()
         except Full:
             logger.info("Decoder queue size is FULL: %d", self.queue.qsize())
