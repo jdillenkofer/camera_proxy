@@ -11,7 +11,7 @@ The communication protocol used by battery based Reolink cameras is named Baichu
 | Name | Description | Status | Implemented |
 |------|-------------|-------------|-------|
 | MJPEG Service | Motion JPEG service provides a video streaming endpoint over HTTP. | Done | ✅ Flask server with args<br />✅ Dynamic endpoints per camera defined in `settings.json` |
-| BC Protocol | Communication protocol used by Reolink cameras over UDP | In Progress | ✅ Broadcast Discovery<br />✅ Legacy login<br />✅ Modern login<br />✅ Legacy login<br />✅ Start video streaming<br />✅ Get camera battery state<br />*(reported only at streaming time within console log)*<br />⬜️ Get camera information |
+| BC Protocol | Communication protocol used by Reolink cameras over UDP | In Progress | ✅ Broadcast Discovery<br />✅ Legacy login<br />✅ Modern login<br />✅ Start video streaming<br />✅ Get camera battery state<br />*(reported only at streaming time within console log)*<br />⬜️ Get camera information |
 | P2P Protocol | Peer-To-Peer Reolink protocol used for camera's discovery and streaming through a relay. | In Progress | ✅ Discovery\*<br />⬜️ Streaming from a relay |
 
 *\*Works only within the same camera network, remote connection by a Reolink relay is not implemented yet.*
@@ -44,7 +44,7 @@ Cameras tested or reported working.
 The application can be executed within a Docker container or from any environment with Python.
 
 ## Endpoints
-As soon as the application is running the folowwing endpoints are available.
+As soon as the application is running the following endpoints are available.
 
  > /api/v1/cameras/{camera_name} \
  > /api/v1/cameras/{camera_name}/stream
@@ -54,7 +54,7 @@ Details : [api-swagger.yaml](docs/api-swagger.yaml)
 ## Docker
 The Baichuan protocol uses broadcast requests to discover the target camera. \
 Meaning the container must ran within `Host` network mode for that discovery mode. \
-However, since P2P protocol is implemented, the conatiner could be isolated but UDP listening port is currently dynamic and cannot be defined yet.
+However, since P2P protocol is implemented, the container could be isolated but UDP listening port is currently dynamic and cannot be defined yet.
 
 
 ### Building a Docker image
@@ -74,7 +74,7 @@ $ docker build https://github.com/vherrlein/camera_proxy.git#develop -t camera_p
 ### Prepare Docker configs
 In order to provide camera's settings, a docker config should be added before runing any container.
 
-*Note: Another solution could use an external json file which would be mounted to the container by a docker volume setting.*
+*Note: Another solution could use an external json file which would be mounted to the container as a docker volume.*
 
 Exemple:
 ```bash 
@@ -122,7 +122,7 @@ networks:
 ```
 
 ### Start-up with Docker Swarm
-Run the following commande at `docker-compose.yml` location.
+Run the following command at `docker-compose.yml` location.
 
 ```bash
 $ docker stack deploy --compose-file docker-compose.yml camera_proxy
@@ -133,7 +133,7 @@ Open a web browser to `http://YOUR_DOCKER_SERVER_IP:9090/api/v1/cameras/camera1`
 __Important note__: the **camera name** is **CASE SENSITIVE**.
 
 ### Console Logs
-As soon as a connection is made on one of camera's endpoints the following console logs appears.
+As soon as a connection is made on one of camera's endpoints the following console logs appears. \
 Sample
 ```console
  * Serving Flask app "main" (lazy loading)
@@ -151,7 +151,7 @@ Sample
 [CameraThread-8] Sending modern login packet
 [CameraThread-8] Send start video cmd
 [CameraThread-8] Battery Percentage: 98
-[Thread-1-7] 172.18.0.5 - - [22/Feb/2021 08:26:20] "GET /api/v1/cameras/Cam1/stream HTTP/1.1" 200 -
+[Thread-1-7] 172.18.0.5 - - [22/Feb/2021 08:26:20] "GET /api/v1/cameras/camera1/stream HTTP/1.1" 200 -
 [Thread-1-7] FPS approx: 0.87, Queue Size: 0
 [Thread-1-7] FPS approx: 5.69, Queue Size: 0
 [Thread-1-7] FPS approx: 7.70, Queue Size: 0
@@ -169,7 +169,7 @@ Sample
 
 ### Requirements
 
-An Operating system with `Python 3.9+` installed. \
+An Operating System with `Python 3.9+` installed. \
 Tested OS:
 - Windows 10 Pro with Python 3.9.1
 - Ubuntu server 20.10 with Python 3.9.1
@@ -183,7 +183,7 @@ Run trhe following command line within your target folder path.
 $ git clone https://github.com/vherrlein/camera_proxy.git
 ```
 
-#### Install Python depencies
+#### Install Python dependencies
 
 Run the following command line at the project root location.
 
@@ -191,7 +191,7 @@ Run the following command line at the project root location.
 pip install -r requirements.txt
 ```
 
-**Important note**: For Windows 10 users, it would be easier to install the `netifaces`  module from a pre-built binaries **prior** executing the command line above. \
+**Important note**: For Windows 10 users, it would be easier to install the `netifaces`  module from a pre-built binary **prior** executing the command line above. \
 Eg. source of pre-built binaries: https://www.lfd.uci.edu/~gohlke/pythonlibs/ 
 
 ### Usage
@@ -220,4 +220,4 @@ python src/main.py
 ```
 
 ## License
-[MIT](license.txt)
+[MIT](./docs/license.txt)
