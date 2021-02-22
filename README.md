@@ -10,9 +10,9 @@ The communication protocol used by battery based Reolink cameras is named Baichu
 
 | Name | Description | Status | Implemented |
 |------|-------------|-------------|-------|
-| MJPEG Service | Motion JPEG service provides a video streaming endpoint over HTTP. | Done | <ul><li>✅ Flask server with args</li><li>✅ Dynamic endpoints per camera defined in `settings.json`</li></ul> |
-| BC Protocol | Communication protocol used by Reolink cameras over UDP | In Progress | <ul><li>✅ Broadcast Discovery</li><li>✅ Legacy login</li><li>✅ Modern login</li><li>✅ Legacy login</li><li>✅ Start video streaming</li><li>✅ Get camera battery state<br />*(reported only at streaming time within console log)*</li><li>⬜️ Get camera information</li></ul> |
-| P2P Protocol | Peer-To-Peer Reolink protocol used for camera's discovery and streaming through a relay. | In Progress | <ul><li>✅ Discovery\*</li><li>⬜️ Streaming from a relay</li></ul> |
+| MJPEG Service | Motion JPEG service provides a video streaming endpoint over HTTP. | Done | ✅ Flask server with args<br />✅ Dynamic endpoints per camera defined in `settings.json` |
+| BC Protocol | Communication protocol used by Reolink cameras over UDP | In Progress | ✅ Broadcast Discovery<br />✅ Legacy login<br />✅ Modern login<br />✅ Legacy login<br />✅ Start video streaming<br />✅ Get camera battery state<br />*(reported only at streaming time within console log)*<br />⬜️ Get camera information |
+| P2P Protocol | Peer-To-Peer Reolink protocol used for camera's discovery and streaming through a relay. | In Progress | ✅ Discovery\*<br />⬜️ Streaming from a relay |
 
 *\*Works only within the same camera network, remote connection by a Reolink relay is not implemented yet.*
 
@@ -34,7 +34,8 @@ Cameras tested or reported working.
   - New design pattern
   - Documentations
 - New features
-  - Provides an RTP endpoint per camera defined wihtin `settings.json` ([GStreamer](https://gitlab.freedesktop.org/gstreamer/gst-python) or [rtmplite3](https://github.com/KnugiHK/rtmplite3))
+  - Add additionnal settings for docker container isolation (UDP listening port, range port map...)
+  - Provides an RTP endpoint per camera defined in `settings.json` file ([GStreamer](https://gitlab.freedesktop.org/gstreamer/gst-python) or [rtmplite3](https://github.com/KnugiHK/rtmplite3))
   - H264 video streaming pass-through?
   - Video streaming decoding with hardware acceleration (VA-API, CUDA) with ffmpeg/libav or OpenCV!
 
@@ -51,8 +52,10 @@ As soon as the application is running the folowwing endpoints are available.
 Details : [api-swagger.yaml](docs/api-swagger.yaml)
 
 ## Docker
-The Baichuan protocol uses broadcast requests within the camera network for the initial discovery. \
-Meaning the container must run within the network `Host`.
+The Baichuan protocol uses broadcast requests to discover the target camera. \
+Meaning the container must ran within `Host` network mode for that discovery mode. \
+However, since P2P protocol is implemented, the conatiner could be isolated but UDP listening port is currently dynamic and cannot be defined yet.
+
 
 ### Building a Docker image
 
@@ -71,11 +74,11 @@ $ docker build https://github.com/vherrlein/camera_proxy.git#develop -t camera_p
 ### Prepare Docker configs
 In order to provide camera's settings, a docker config should be added before runing any container.
 
-*Note: Another solution could be using an external json file which can be mounted to the container throught docker volumes settings.*
+*Note: Another solution could use an external json file which would be mounted to the container by a docker volume setting.*
 
 Exemple:
 ```bash 
-$ cat << EOF
+$ cat << EOF | docker config create my-cameras-settings -
 {
     "cameras": [
         {
@@ -86,7 +89,7 @@ $ cat << EOF
         }
     ]
 }
-EOF | docker config create my-cameras-settings -
+EOF
 ```
 __Important note__: the **camera name** is **CASE SENSITIVE**.
 
@@ -118,15 +121,49 @@ networks:
       name: "host"
 ```
 
-### Start-up with Docker compose
+### Start-up with Docker Swarm
 Run the following commande at `docker-compose.yml` location.
+
 ```bash
-$ docker-compose up
+$ docker stack deploy --compose-file docker-compose.yml camera_proxy
 ```
 
 Open a web browser to `http://YOUR_DOCKER_SERVER_IP:9090/api/v1/cameras/camera1`
 
 __Important note__: the **camera name** is **CASE SENSITIVE**.
+
+### Console Logs
+As soon as a connection is made on one of camera's endpoints the following console logs appears.
+Sample
+```console
+ * Serving Flask app "main" (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+[MainThread-1]  * Running on http://0.0.0.0:9090/ (Press CTRL+C to quit)
+[DecoderThread-9] Decoder deamon started
+[CameraThread-8] Sending discovery packet
+[CameraThread-8] Received discovery packet answer from XXX.XXX.XXX.XXX
+[CameraThread-8] Sending legacy login packet
+[CameraThread-8] Receiving nonce packet
+[CameraThread-8] Received nonce: 0-AhnEZyUg6ew0ETWED156
+[CameraThread-8] Sending modern login packet
+[CameraThread-8] Send start video cmd
+[CameraThread-8] Battery Percentage: 98
+[Thread-1-7] 172.18.0.5 - - [22/Feb/2021 08:26:20] "GET /api/v1/cameras/Cam1/stream HTTP/1.1" 200 -
+[Thread-1-7] FPS approx: 0.87, Queue Size: 0
+[Thread-1-7] FPS approx: 5.69, Queue Size: 0
+[Thread-1-7] FPS approx: 7.70, Queue Size: 0
+[Thread-1-7] FPS approx: 9.23, Queue Size: 0
+[Thread-1-7] FPS approx: 6.61, Queue Size: 0
+[DecoderThread-9] Decoder - Reduction Factor: 1.00, Queue size: 1, Processing time avg: 0.1034s
+[Thread-1-7] FPS approx: 9.02, Queue Size: 0
+[Thread-1-7] FPS approx: 8.36, Queue Size: 0
+[Thread-1-7] FPS approx: 9.46, Queue Size: 0
+[Thread-1-7] FPS approx: 7.44, Queue Size: 0
+[Thread-1-7] FPS approx: 8.70, Queue Size: 0
+```
 
 ## Standalone or Development Environment
 
