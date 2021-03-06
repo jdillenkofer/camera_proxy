@@ -94,7 +94,7 @@ class BaichuanControlLayer:
         self.udp_layer.send_packet(login_message_buffer)
 
     def start_video(self, stream):
-        xml_body = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<body>\n<Preview version=\"1.1\">\n<channelId>0</channelId>\n<handle>0</handle>\n<streamType>{stream}</streamType>\n</Preview>\n</body>\n"
+        xml_body = f"<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<body>\n<Preview version=\"1.1\">\n<channelId>0</channelId>\n<handle>0</handle>\n<streamType>{stream}</streamType>\n</Preview>\n</body>\n"
         xml_bytes = xml_body.encode("utf-8")
         encrypted_xml_body = self.xml_decrypt(xml_bytes, self.encryption_offset)
 
