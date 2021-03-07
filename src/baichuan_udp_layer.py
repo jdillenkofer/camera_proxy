@@ -45,6 +45,7 @@ class BaichuanUdpLayer:
         self.connection_id = -1
         self.last_send_packet_id = 0
         self.last_received_packet_id = -1
+        self.wait_acknowledgement = 0
         self.target_address = (None, None)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         server_address = (BINDING_IFACE_IP, self.communication_port)
@@ -295,9 +296,14 @@ class BaichuanUdpLayer:
         if udp_message_id != UDP_MESSAGE_ID_ACK or client_id != self.client_id:
             return
         if packet_id < self.last_send_packet_id - 1:
-            self.resend_unacknowledged_packets(packet_id, self.last_send_packet_id - 1)
-        else:
+            self.wait_acknowledgement += 1
+            # Give the camera some time to send
+            # the correct acknowledged packet id
+            if self.wait_acknowledgement > 10:
+                self.resend_unacknowledged_packets(packet_id, self.last_send_packet_id - 1)
+        elif self.wait_acknowledgement != 0:
             self.unack_messages = {}
+            self.wait_acknowledgement = 0
         
     def resend_unacknowledged_packets(self, packet_id, max_message):
         for i in range(packet_id + 1, max_message + 1):
