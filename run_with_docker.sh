@@ -1,1 +1,1 @@
-docker run -d --restart unless-stopped --network host camera_proxy:1.1.3
+docker run --name camera_proxy -d --restart unless-stopped --mount type=bind,source="$(pwd)"/settings.json,target=/app/settings.json,readonly --network host camera_proxy:1.1.3
