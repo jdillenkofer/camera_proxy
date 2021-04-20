@@ -126,6 +126,19 @@ def get_image_from_camera(name):
     else:
         abort(404)
 
+@app.after_request
+def add_header(r):
+    """
+    Add headers to both force latest IE rendering engine or Chrome Frame,
+    and also to cache the rendered page for 10 minutes.
+    """
+    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    r.headers["Pragma"] = "no-cache"
+    r.headers["Expires"] = "0"
+    r.headers['Cache-Control'] = 'public, max-age=0'
+    return r
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='A small webserver to extract images from reolink cameras.')
     parser.add_argument("--debug", dest="debug", action="store_true", help="Starts the server in debug mode.")
