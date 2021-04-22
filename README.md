@@ -63,20 +63,18 @@ However, since P2P protocol is implemented, the container could be isolated but 
 $ docker build https://<github_repo_url>/camera_proxy.git#<branch_name> -t <tag_name>
 ```
 
-Exemple:
+Example:
 ```bash 
 $ docker build https://github.com/vherrlein/camera_proxy.git#develop -t camera_proxy:dev-amd64
 ```
 
-*For additionnal information regarding to Docker image building : \
+*For additional information regarding to Docker image building : \
 [Docker build command line reference](https://docs.docker.com/engine/reference/commandline/build/)*
 
 ### Prepare Docker configs
-In order to provide camera's settings, a docker config should be added before runing any container.
+In order to provide camera's settings, a docker config should be added before running any container.
 
-*Note: Another solution could use an external json file which would be mounted to the container as a docker volume.*
-
-Exemple:
+Example:
 ```bash 
 $ cat << EOF | docker config create my-cameras-settings -
 {
@@ -92,6 +90,13 @@ $ cat << EOF | docker config create my-cameras-settings -
 EOF
 ```
 __Important note__: the **camera name** is **CASE SENSITIVE**.
+
+
+*Note: Another solution could use an external settings.json file which would be mounted to the container as a docker volume. Example:*
+``` 
+--mount type=bind,source="$(pwd)"/settings.json,target=/app/settings.json,readonly
+```
+
 
 ### Docker compose
 Sample `docker-compose.yml`
@@ -178,7 +183,7 @@ Tested OS:
 
 #### Import the git repo
 
-Run trhe following command line within your target folder path.
+Run the following command line within your target folder path.
 ```bash
 $ git clone https://github.com/vherrlein/camera_proxy.git
 ```
