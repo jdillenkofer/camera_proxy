@@ -18,12 +18,15 @@ class CameraStreamManager:
         if stream is not None:
             return stream
         
+        # read camera configuration passed from settings.json
         device_sid = camera_settings["deviceSid"]
         username = camera_settings["username"]
         password = camera_settings["password"]
         backup_image = camera_settings["backupImage"] if "backupImage" in camera_settings else None
+        ipaddress = camera_settings["ipaddress"] if "ipaddress" in camera_settings else None
+        comm_port = camera_settings["comm_port"] if "comm_port" in camera_settings else 0
         
-        camera = Camera(device_sid, username, password)
+        camera = Camera(device_sid, username, password, ipaddress, comm_port)
         decoder = Decoder()
         def start_camera():
             camera.start(lambda video_data, audio_data: decoder.queue_data(video_data))

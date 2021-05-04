@@ -12,11 +12,13 @@ MAX_INT32 = 0x7FFFFFFF
 logger = logging.getLogger(__name__)
 
 class Camera:
-    def __init__(self, device_sid, username, password):
+    def __init__(self, device_sid, username, password, ipaddress, comm_port):
         self.device_sid = device_sid
         self.username = username
         self.password = password
         self.is_running = False
+        self.ipaddress = ipaddress
+        self.comm_port = comm_port
 
     def start(self, handle_video_and_audio_stream):
         self.is_running = True
@@ -29,7 +31,7 @@ class Camera:
     def _start_stream(self, handle_video_and_audio_stream):
         client_id = random.randint(0, MAX_INT32)
 
-        udp_layer = baichuan_udp_layer.BaichuanUdpLayer(self.device_sid, client_id)
+        udp_layer = baichuan_udp_layer.BaichuanUdpLayer(self.device_sid, client_id, self.ipaddress,self.comm_port)
         control_layer = baichuan_control_layer.BaichuanControlLayer(self.username, self.password, udp_layer)
 
         udp_layer.discover_device()

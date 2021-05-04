@@ -4,7 +4,7 @@ import socket
 import struct
 import logging
 import xml.etree.ElementTree as ElementTree
-import netifaces;
+import netifaces
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ P2P_RELAY_HOSTNAMES = [
 ]
 
 class BaichuanUdpLayer:
-    def __init__(self, device_sid, client_id, communication_port=0):
+    def __init__(self, device_sid, client_id, ipaddress, communication_port=0):
         self.device_sid = device_sid
         self.client_id = client_id
         self.device_id = None
@@ -46,7 +46,7 @@ class BaichuanUdpLayer:
         self.last_send_packet_id = 0
         self.last_received_packet_id = -1
         self.wait_acknowledgement = 0
-        self.target_address = (None, None)
+        self.target_address = (ipaddress, None)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         server_address = (BINDING_IFACE_IP, self.communication_port)
         self.socket.bind(server_address)
@@ -91,15 +91,19 @@ class BaichuanUdpLayer:
                 cid_element = xml_root.find("D2C_C_R/cid")
                 if did_element != None and cid_element != None: 
                     self.device_id = int(did_element.text)
+                    logger.info("Device ID: %s", self.device_id)
                     client_id = int(cid_element.text)
                 else:
                     continue
             except socket.timeout:
                 continue
-            logger.info("Received discovery packet answer from %s", sender[0])
+            logger.info("Received discovery packet answer from %s (%s)", sender[0], sender[1])
 
         if retry <= 0:
-            self.p2p_discover()
+            if self.target_address[0] is None:
+                self.p2p_discover()
+            else:
+                logger.info("Skipping p2p_discover because target was set. Local discovery only.")
         else:
             self.target_address = sender
             self.socket.settimeout(30)
@@ -194,7 +198,7 @@ class BaichuanUdpLayer:
         
         self.device_id = device_id
 
-        logger.info("P2P - Devide ID received, %d", device_id)
+        logger.info("P2P - Device ID received, %d", device_id)
         
         self._send_p2p_remote_connection(log_address) #Announce we will connect locally
         self._send_p2p_dmap_connection(endpoint_address) #Announce we could connect remotely
