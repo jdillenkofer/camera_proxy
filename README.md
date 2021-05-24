@@ -74,6 +74,8 @@ $ docker build https://github.com/vherrlein/camera_proxy.git#develop -t camera_p
 ### Prepare Docker configs
 In order to provide camera's settings, a docker config should be added before running any container.
 
+*Note: Another solution could use an external json file which would be mounted to the container as a docker volume.*
+
 Example:
 ```bash 
 $ cat << EOF | docker config create my-cameras-settings -
@@ -210,11 +212,18 @@ Create a `settings.json` file with one or more camera entries at the project roo
             "deviceSid": "12345678910ABC5D",
             "username": "admin",
             "password": "password",
+            "ipaddress": "192.168.1.44",
+            "comm_port": 12345,
             "backupImage": "../public/images/klingel.jpg"
         }
     ]
 }
 ```
+The following values are optional:
+- **backupImage**: The image to be shown if no camera image can be obtained.
+- **comm_port**: The communication port to be used by the proxy to send out the broadcast. This can be used to open a specific port in your firewall settings for this camera proxy.
+- **ipaddress**: The known IP address for the camera (on the local network). When set, the proxy only tries the local discovery and skips the P2P discovery. This is useful to keep traffic within the local subnet.
+
 
 __Important note__: the **camera name** is **CASE SENSITIVE**.
 
