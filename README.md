@@ -1,5 +1,13 @@
 # Camera Proxy
 
+---
+
+**This project has been archived, and is no longer under active maintainenance.**
+It's purpose was only a proof of concept for the support of battery powered cameras for the people from the [neolink](https://github.com/thirtythreeforty/neolink) project.
+If you require a supported solution for your battery powered cameras, I suggest you to use neolink instead.
+
+---
+
 Camera Proxy is a Python webserver which can display a video stream from the reolink argus 2 camera over http.
 
 ## Dependencies
